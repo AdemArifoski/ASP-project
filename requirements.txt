@@ -1,3 +1,4 @@
 streamlit
 clingo
-streamlit_calandar
+pandas
+streamlit-calendar
