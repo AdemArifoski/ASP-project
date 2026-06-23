@@ -1,33 +1,45 @@
-
 % =========================
-% CHOOSE NUMBER OF BLOCKS
+% HOURS (atomic units)
 % =========================
-possible_blocks(D,T,B) :- split(D,T,B).
-possible_blocks(D,T,1) :- available(D,T,_), not split(D,T,_).
-
-1 { use_blocks(D,T,B) : possible_blocks(D,T,B) } 1 :-
-    available(D,T,_).
-
-% =========================
-% GENERATE BLOCKS
-% =========================
-block(D,T,I) :-
-    use_blocks(D,T,B),
-    I = 1..B.
-
-% =========================
-% HOURS PER BLOCK
-% =========================
-block_hours(D,T,Hb) :-
+hour(D,T,I) :-
     available(D,T,H),
-    use_blocks(D,T,B),
-    Hb = H / B.
+    I = 1..H.
 
 % =========================
-% STUDY CHOICE (per block)
+% STUDY ASSIGNMENT
 % =========================
 0 { study(S,D,T,I) : subject(S) } 1 :-
-    block(D,T,I).
+    hour(D,T,I).
+
+% =========================
+% SPLIT LOGIC
+% =========================
+
+% if split exists → use it
+slot_capacity(D,T,B) :-
+    split(D,T,B).
+
+% if no split → only 1 subject allowed
+slot_capacity(D,T,1) :-
+    available(D,T,_),
+    not split(D,T,_).
+
+% track which subjects are used in a slot
+used_subject(D,T,S) :-
+    study(S,D,T,_).
+
+% do not exceed capacity
+:- slot_capacity(D,T,B),
+   #count { S : used_subject(D,T,S) } > B.
+
+% if split is defined → must use exactly B subjects
+:- split(D,T,B),
+   #count { S : used_subject(D,T,S) } != B.
+
+% prevent impossible splits
+:- split(D,T,B),
+   available(D,T,H),
+   B > H.
 
 % =========================
 % REQUIRED HOURS
@@ -43,21 +55,13 @@ required_hours(S,H) :-
 % =========================
 study_hours(S,H) :-
     subject(S),
-    H = #sum {
-        Hb,D,T,I :
-        study(S,D,T,I),
-        block_hours(D,T,Hb)
-    }.
+    H = #sum { 1,D,T,I : study(S,D,T,I) }.
 
 % =========================
 % WEEKLY CAPACITY
 % =========================
 weekly_capacity(H) :-
-    H = #sum {
-        Hb,D,T,I :
-        block(D,T,I),
-        block_hours(D,T,Hb)
-    }.
+    H = #count { D,T,I : hour(D,T,I) }.
 
 % =========================
 % WEEKS NEEDED
@@ -67,43 +71,29 @@ weeks_needed(S,W) :-
     weekly_capacity(C),
     W = (H + C - 1) / C.
 
-
-
-block_info(D,T,I,Hb) :-
-    block(D,T,I),
-    block_hours(D,T,Hb).
-
-
 % =========================
 % CONSTRAINTS
 % =========================
-
-% do not exceed required hours
+% exact required hours
 :- required_hours(S,Req),
    study_hours(S,Got),
-   Got > Req.
-
-:- required_hours(S,Req),
-   study_hours(S,Got),
-   Got < Req - 1.
+   Got != Req.
 
 % =========================
 % SOFT PENALTY FOR AVOID
 % =========================
 #minimize {
-    Hb@1, S,D,T,I :
+    1,S,D,T,I :
     study(S,D,T,I),
-    avoid(D,T),
-    block_hours(D,T,Hb)
+    avoid(D,T)
 }.
 
 % =========================
 % OPTIMIZATION
 % =========================
 #maximize {
-    Hb*(P - W)@2, S,D,T,I :
+    (P - W)@2, S,D,T,I :
     study(S,D,T,I),
-    block_hours(D,T,Hb),
     priority(S,P),
     subject_strength(S,W)
 }.
@@ -112,13 +102,10 @@ block_info(D,T,I,Hb) :-
 % OUTPUT
 % =========================
 #show study/4.
-%#show use_blocks/3.
-%#show study_hours/2.
+#show required_hours/2.
+#show study_hours/2.
 #show weeks_needed/2.
-#show block_info/4.
-%#show required_hours/2.
-%#show study_hours/2.
-
+#show split/3.
 
 
 
