@@ -2,3 +2,5 @@ streamlit
 clingo
 pandas
 streamlit-calendar
+json 
+os
