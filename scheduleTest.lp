@@ -85,7 +85,7 @@ block_info(D,T,I,Hb) :-
 
 :- required_hours(S,Req),
    study_hours(S,Got),
-   Got < Req.
+   Got < Req - 1.
 
 % =========================
 % SOFT PENALTY FOR AVOID
