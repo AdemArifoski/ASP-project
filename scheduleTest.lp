@@ -114,7 +114,7 @@ block_info(D,T,I,Hb) :-
 #show study/4.
 %#show use_blocks/3.
 %#show study_hours/2.
-%#show weeks_needed/2.
+#show weeks_needed/2.
 #show block_info/4.
 %#show required_hours/2.
 %#show study_hours/2.
