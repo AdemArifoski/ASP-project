@@ -2,6 +2,8 @@ import streamlit as st
 import clingo
 import pandas as pd
 from datetime import datetime, timedelta
+import json
+
 
 st.subheader("Subjects")
 
@@ -186,6 +188,28 @@ def generate_asp_facts(subject_data, availability):
     lines.append("")
 
     # =========================
+    # AVOID
+    # =========================
+    lines.append("% =========================")
+    lines.append("% AVOID")
+    lines.append("% =========================")
+
+    all_days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
+    all_slots = ["morning","afternoon","evening"]
+
+    for day in all_days:
+        for slot in all_slots:
+
+            # normalize lookup properly
+            slot_data = availability.get(day.capitalize(), {}).get(slot.capitalize())
+
+            if not slot_data or slot_data.get("hours", 0) <= 0:
+                lines.append(f"avoid({day},{slot}).")
+
+    
+    lines.append("")
+
+    # =========================
     # OPTIONAL SPLITS
     # =========================
     lines.append("% =========================")
@@ -225,7 +249,7 @@ TIME_MAP = {
     "evening": 18,
 }
 
-def clingo_to_events(models):
+def clingo_to_events(models, block_map):
     events = []
 
     for model in models:
@@ -237,18 +261,26 @@ def clingo_to_events(models):
             inside = atom[len("study("):-1]
             subject, day, slot, block = [p.strip() for p in inside.split(",")]
 
+            block = int(block)
+
             hour = TIME_MAP.get(slot, 9)
             day_index = DAY_MAP.get(day, 0)
 
             today = datetime.today()
             start_date = today + timedelta(days=(day_index - today.weekday()) % 7)
 
-            block = int(block)
-
+            # 🔥 base start
             start = start_date.replace(hour=hour, minute=0)
-            start = start + timedelta(minutes=(block - 1) * 60)
 
-            end = start + timedelta(minutes=60)
+            # 🔥 accumulate previous blocks safely
+            for b in range(1, block):
+                prev_duration = block_map.get((day, slot, b), 1)
+                start += timedelta(hours=prev_duration)
+
+            # 🔥 current block duration
+            duration_hours = block_map.get((day, slot, block), 1)
+
+            end = start + timedelta(hours=duration_hours)
 
             events.append({
                 "title": subject,
@@ -260,12 +292,19 @@ def clingo_to_events(models):
 
 
 
-def extract_weeks(models):
+def extract_weeks_per_subject(models):
+    result = {}
+
     for model in models:
         for atom in model:
             if atom.startswith("weeks_needed("):
-                return int(atom.split("(")[1].split(")")[0])
-    return 1
+                inside = atom[len("weeks_needed("):-1]
+                subject, weeks = inside.split(",")
+                result[subject.strip()] = int(weeks)
+
+    return result
+
+
 
 def shift_event(event, deadline, weeks_needed):
     start = datetime.fromisoformat(event["start"])
@@ -292,6 +331,22 @@ def shift_event(event, deadline, weeks_needed):
     event["end"] = (corrected_start + duration).isoformat()
 
     return event
+
+
+def extract_block_info(models):
+    block_map = {}
+
+    for model in models:
+        for atom in model:
+            if atom.startswith("block_info("):
+                inside = atom[len("block_info("):-1]
+                d, t, i, hb = [x.strip() for x in inside.split(",")]
+
+                key = (d, t, int(i))
+                block_map[key] = float(hb)
+
+    return block_map
+
 
 if st.button("Generate Schedule"):
 
@@ -324,17 +379,20 @@ if st.button("Generate Schedule"):
         control.solve(on_model=on_model)
 
         # 3. Extract weeks_needed FIRST (IMPORTANT FIX)
-        weeks_needed = extract_weeks(models)
-        st.write("Weeks needed:", weeks_needed)
+        weeks_map = extract_weeks_per_subject(models)
 
         # 4. Convert schedule
-        events = clingo_to_events(models)
+        block_map = extract_block_info(models)
+        events = clingo_to_events(models, block_map)
 
         # 5. SHIFT EVENTS BACK BY WEEKS_NEEDED
         adjusted_events = []
 
         for e in events:
             subject = e["title"]
+            if subject not in weeks_map:
+                st.warning(f"No weeks_needed found for {subject}, defaulting to 1")
+            weeks_needed = weeks_map.get(subject, 1)
             deadline = deadlines.get(subject)
 
             if not deadline:
@@ -348,6 +406,9 @@ if st.button("Generate Schedule"):
         # 6. Save to calendar
         st.session_state.calendar_events = adjusted_events
 
+        with open("calendar_events.json", "w") as f:
+            json.dump(adjusted_events, f)
+            
         # 7. Show results
         st.subheader("Generated Schedule")
 

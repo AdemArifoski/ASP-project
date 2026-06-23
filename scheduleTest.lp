@@ -1,8 +1,9 @@
+
 % =========================
 % CHOOSE NUMBER OF BLOCKS
 % =========================
-possible_blocks(D,T,1) :- available(D,T,_).
 possible_blocks(D,T,B) :- split(D,T,B).
+possible_blocks(D,T,1) :- available(D,T,_), not split(D,T,_).
 
 1 { use_blocks(D,T,B) : possible_blocks(D,T,B) } 1 :-
     available(D,T,_).
@@ -59,18 +60,10 @@ weekly_capacity(H) :-
     }.
 
 % =========================
-% TOTAL REQUIRED
-% =========================
-total_required(H) :-
-    H = #sum {
-        X,S : required_hours(S,X)
-    }.
-
-% =========================
 % WEEKS NEEDED
 % =========================
-weeks_needed(W) :-
-    total_required(H),
+weeks_needed(S,W) :-
+    required_hours(S,H),
     weekly_capacity(C),
     W = (H + C - 1) / C.
 
@@ -89,6 +82,10 @@ block_info(D,T,I,Hb) :-
 :- required_hours(S,Req),
    study_hours(S,Got),
    Got > Req.
+
+:- required_hours(S,Req),
+   study_hours(S,Got),
+   Got < Req.
 
 % =========================
 % SOFT PENALTY FOR AVOID
@@ -117,8 +114,10 @@ block_info(D,T,I,Hb) :-
 #show study/4.
 %#show use_blocks/3.
 %#show study_hours/2.
-#show weeks_needed/1.
-%#show block_info/4.
+%#show weeks_needed/2.
+#show block_info/4.
+%#show required_hours/2.
+%#show study_hours/2.
 
 
 

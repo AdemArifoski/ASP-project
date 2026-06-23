@@ -1,5 +1,9 @@
 import streamlit as st
 from streamlit_calendar import calendar
+import os
+import json
+
+
 
 st.title("Calendar")
 
@@ -7,7 +11,11 @@ st.title("Calendar")
 # SESSION INIT
 # -------------------------
 if "calendar_events" not in st.session_state:
-    st.session_state.calendar_events = []
+    if os.path.exists("calendar_events.json"):
+        with open("calendar_events.json", "r") as f:
+            st.session_state.calendar_events = json.load(f)
+    else:
+        st.session_state.calendar_events = []
 
 if "view" not in st.session_state:
     st.session_state.view = "dayGridMonth"
@@ -27,9 +35,9 @@ calendar_options = {
         "center": "title",
         "right": "dayGridMonth,timeGridDay"
     },
-    "editable": True,
+    "editable": False,
     "selectable": True,
-    "events": st.session_state.calendar_events,   # 👈 IMPORTANT
+    "events": st.session_state.calendar_events,   # IMPORTANT
 }
 
 
@@ -40,7 +48,17 @@ state = calendar(options=calendar_options)
 
 st.write(state)
 
+# -------------------------
+# RESET BUTTON (HERE)
+# -------------------------
+if st.button("Reset Calendar"):
+    st.session_state.calendar_events = []
 
+    if os.path.exists("calendar_events.json"):
+        os.remove("calendar_events.json")
+
+    st.rerun()
+    
 # -------------------------
 # INTERACTIONS
 # -------------------------
