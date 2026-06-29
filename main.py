@@ -3,8 +3,30 @@ import clingo
 import pandas as pd
 from datetime import datetime, timedelta
 import json
+from streamlit_calendar import calendar
+import os
 
 
+
+
+if "subjects" not in st.session_state:
+    st.session_state.subjects = []
+
+if "subject_data" not in st.session_state:
+    st.session_state.subject_data = pd.DataFrame(
+        columns=["Subject", "Difficulty", "Priority", "Strength"]
+    )
+
+if "deadlines" not in st.session_state:
+    st.session_state.deadlines = {}
+
+if "schedule_type" not in st.session_state:
+    st.session_state.schedule_type = None
+
+if "schedule_message" not in st.session_state:
+    st.session_state.schedule_message = None
+
+    
 st.subheader("Subjects")
 
 subject_input = st.text_input(
@@ -12,62 +34,102 @@ subject_input = st.text_input(
     placeholder="e.g. im, tcs2"
 )
 
-selected_subjects = [
-    s.strip() for s in subject_input.split(",") if s.strip()
-]
+if st.button("Add Subjects"):
+
+    new_subjects = [
+        s.strip()
+        for s in subject_input.split(",")
+        if s.strip()
+    ]
+
+    old_df = st.session_state.subject_data.copy()
+
+    # Convert existing subjects to set
+    existing_subjects = set(old_df["Subject"].tolist())
+
+    # Build rows only for NEW subjects
+    new_rows = []
+
+    for s in new_subjects:
+        if s not in existing_subjects:
+            new_rows.append({
+                "Subject": s,
+                "Difficulty": 1,
+                "Priority": 1,
+                "Strength": 1
+            })
+
+    # Append new subjects to existing table
+    if new_rows:
+        st.session_state.subject_data = pd.concat(
+            [old_df, pd.DataFrame(new_rows)],
+            ignore_index=True
+        )
 
 
+if not st.session_state.subject_data.empty:
 
-df = pd.DataFrame({
-    "Subject": selected_subjects,
-    "Difficulty": [1]*len(selected_subjects),
-    "Priority": [1]*len(selected_subjects),
-    "Strength": [1]*len(selected_subjects),
-})
+    edited_df = st.data_editor(
+        st.session_state.subject_data,
+        width="stretch",
+        num_rows="fixed",
+        key="subject_editor",
+        column_config={
+            "Difficulty": st.column_config.NumberColumn(
+                min_value=1,
+                max_value=5,
+                step=1,
+            ),
+            "Priority": st.column_config.NumberColumn(
+                min_value=1,
+                max_value=5,
+                step=1,
+            ),
+            "Strength": st.column_config.NumberColumn(
+                min_value=1,
+                max_value=5,
+                step=1,
+            ),
+        }
+    )
 
-edited_df = st.data_editor(
-    df,
-    width= "stretch",
-    num_rows="fixed",
-    column_config={
-        "Difficulty": st.column_config.NumberColumn(
-            "Difficulty",
-            min_value=1,
-            max_value=5,
-            step=1
-        ),
-        "Priority": st.column_config.NumberColumn(
-            "Priority",
-            min_value=1,
-            max_value=5,
-            step=1
-        ),
-        "Strength": st.column_config.NumberColumn(
-            "Strength",
-            min_value=1,
-            max_value=5,
-            step=1
-        ),
-    }
+    st.session_state.subject_data = edited_df
+
+subject_data = (
+    st.session_state.subject_data
+    .set_index("Subject")
+    .to_dict("index")
+    if not st.session_state.subject_data.empty
+    else {}
 )
 
-subject_data = edited_df.set_index("Subject").to_dict("index")
+selected_subjects = (
+    st.session_state.subject_data["Subject"].tolist()
+    if not st.session_state.subject_data.empty
+    else []
+)
 
 
 
 st.subheader("Deadlines")
-deadlines = {}
+
+selected_subjects = (
+    st.session_state.subject_data["Subject"].tolist()
+    if not st.session_state.subject_data.empty
+    else []
+)
 
 if selected_subjects:
     st.write("Enter deadlines for each subject:")
 
     for subject in selected_subjects:
-        deadlines[subject] = st.date_input(
-            f"Deadline for {subject}",
-            value=None,  # no default date
-            key=f"deadline_{subject}"
-        )
+        key = subject.lower()
 
+        st.session_state.deadlines[key] = st.date_input(
+            f"Deadline for {subject}",
+            value=st.session_state.deadlines.get(key),
+            key=f"deadline_{key}"
+        )
 
 
 
@@ -93,8 +155,8 @@ for d in days:
             if checked:
                 hours = st.number_input(
                     "Hours",
-                    min_value=0,
-                    max_value=10,
+                    min_value=1,
+                    max_value=4,
                     value=2,
                     key=f"hours_{d}_{slot}"
                 )
@@ -124,12 +186,6 @@ for d in days:
 
 
 
-st.subheader("Study Plan Choice")
-schedule_choice = st.radio(
-    "Do you want multiple schedule to select from?",
-    ["No", "Yes"],
-    key="schedule_choice"
-)
 
 
 def generate_asp_facts(subject_data, availability):
@@ -336,7 +392,7 @@ def shift_event(event, deadline, weeks_needed):
 
     corrected_start = window_start + timedelta(days=weekday_offset)
 
-    # 🔥 KEEP ORIGINAL HOUR (THIS IS THE IMPORTANT FIX)
+    # KEEP ORIGINAL HOUR (THIS IS THE IMPORTANT FIX)
     corrected_start = corrected_start.replace(
         hour=start.hour,
         minute=0
@@ -366,10 +422,8 @@ if st.button("Generate Schedule"):
         control.load("scheduleTest.lp")
         control.load("facts.lp")
 
-        if schedule_choice == "Yes":
-            control.configuration.solve.models = 0
-        else:
-            control.configuration.solve.models = 1
+        
+        control.configuration.solve.models = 1
 
         control.ground([("base", [])])
 
@@ -393,7 +447,7 @@ if st.button("Generate Schedule"):
         for e in raw_events:
             subject = e["title"]
             weeks_needed = weeks_map.get(subject, 1)
-            deadline = deadlines.get(subject)
+            deadline = st.session_state.deadlines.get(subject.lower())
 
             if deadline:
                 shifted_events.append(
@@ -423,17 +477,88 @@ if st.button("Generate Schedule"):
         )
 
         if not models or not has_study:
-            st.warning("No valid schedule found.")
-            st.info(
-                "You may need to add more available days or time slots "
-                "to fit all required study hours."
+            st.session_state.schedule_type = "warning"
+            st.session_state.schedule_message = (
+                "No valid schedule found. You may need to add more available days or time slots."
             )
         else:
-            for i, m in enumerate(models):
-                st.write(f"### Solution {i+1}")
-                st.code("\n".join(m))
+            st.session_state.schedule_type = "success"
+            st.session_state.schedule_message = "\n".join(models[0])
 
     else:
-        st.warning("Please enter subjects and availability first.")
+        st.session_state.schedule_type = "warning"
+        st.session_state.schedule_message = (
+            "Please enter subjects and availability first."
+        )
 
 
+if st.session_state.schedule_type == "warning":
+    st.warning(st.session_state.schedule_message)
+
+elif st.session_state.schedule_type == "success":
+    st.subheader("Generated Schedule")
+    st.code(st.session_state.schedule_message)
+
+
+# ---------------------------------------------------------------------------
+# CALANDAR
+
+
+st.title("Calendar")
+
+# -------------------------
+# SESSION INIT
+# -------------------------
+if "calendar_events" not in st.session_state:
+    st.session_state.calendar_events = []
+    if os.path.exists("calendar_events.json"):
+        with open("calendar_events.json", "r") as f:
+            st.session_state.calendar_events = json.load(f)
+
+if "view" not in st.session_state:
+    st.session_state.view = "dayGridMonth"
+
+if "view_date" not in st.session_state:
+    st.session_state.view_date = None
+
+
+# -------------------------
+# OPTIONS
+# -------------------------
+calendar_options = {
+    "initialView": st.session_state.view,
+    "initialDate": st.session_state.view_date,
+    "headerToolbar": {
+        "left": "prev,next today",
+        "center": "title",
+        "right": "dayGridMonth,timeGridDay"
+    },
+    "editable": False,
+    "selectable": True,
+    "events": st.session_state.calendar_events,   # IMPORTANT
+}
+
+
+
+
+# RENDER
+state = calendar(options=calendar_options)
+
+#st.write(state)
+
+
+# RESET BUTTON 
+if st.button("Reset Calendar"):
+    st.session_state.calendar_events = []
+
+    if os.path.exists("calendar_events.json"):
+        os.remove("calendar_events.json")
+
+    st.rerun()
+    
+
+# INTERACTIONS
+if state.get("callback") == "dateClick":
+    st.session_state.view_date = state["dateClick"]["date"]
+    st.session_state.view = "timeGridDay"
+    st.rerun()
