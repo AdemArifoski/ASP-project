@@ -13,6 +13,7 @@ A study scheduling application built with **Python**, **Streamlit**, and **Answe
 * Configure weekly availability (morning, afternoon, evening)
 * Customize study session duration
 * Generate optimized study schedules using **Answer Set Programming (ASP)**
+* View the generated study schedule in a calendar
 * Upload multiple students through a JSON file
 * Automatically convert JSON data into ASP facts
 * Solve scheduling constraints using **Clingo**
