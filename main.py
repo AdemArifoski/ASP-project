@@ -191,10 +191,7 @@ for d in days:
 def generate_asp_facts(subject_data, availability):
     lines = []
 
-    # =========================
     # DAYS (ONLY IF USED)
-    # =========================
-
     used_days = [
         d.lower() for d, slots in availability.items()
         if any(slot_data["hours"] > 0 for slot_data in slots.values())
@@ -203,18 +200,14 @@ def generate_asp_facts(subject_data, availability):
     if used_days:
         lines.append("day(" + "; ".join(used_days) + ").\n")
 
-    # =========================
+
     # SUBJECTS
-    # =========================
     subjects = [s.lower() for s in subject_data.keys()]
     lines.append("subject(" + "; ".join(subjects) + ").\n")
 
-    # =========================
+    
     # SUBJECT PROPERTIES
-    # =========================
-    lines.append("% =========================")
     lines.append("% SUBJECT PROPERTIES")
-    lines.append("% =========================")
 
     for s, props in subject_data.items():
         s = s.lower()
@@ -225,12 +218,8 @@ def generate_asp_facts(subject_data, availability):
 
     lines.append("")
 
-    # =========================
     # AVAILABILITY
-    # =========================
-    lines.append("% =========================")
     lines.append("% AVAILABILITY")
-    lines.append("% =========================")
 
     for day, slots in availability.items():
         day = day.lower()
@@ -243,12 +232,9 @@ def generate_asp_facts(subject_data, availability):
 
     lines.append("")
 
-    # =========================
+   
     # AVOID
-    # =========================
-    lines.append("% =========================")
     lines.append("% AVOID")
-    lines.append("% =========================")
 
     all_days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
     all_slots = ["morning","afternoon","evening"]
@@ -265,12 +251,9 @@ def generate_asp_facts(subject_data, availability):
     
     lines.append("")
 
-    # =========================
-    # OPTIONAL SPLITS
-    # =========================
-    lines.append("% =========================")
-    lines.append("% OPTIONAL SPLITS")
-    lines.append("% =========================")
+   
+    # SPLITS
+    lines.append("% SPLITS")
 
     for day, slots in availability.items():
         day = day.lower()
@@ -479,7 +462,7 @@ if st.button("Generate Schedule"):
         if not models or not has_study:
             st.session_state.schedule_type = "warning"
             st.session_state.schedule_message = (
-                "No valid schedule found. You may need to add more available days or time slots."
+                "No valid schedule found. You may need to add more available days or time slots or splits are impossible."
             )
         else:
             st.session_state.schedule_type = "success"
@@ -506,9 +489,8 @@ elif st.session_state.schedule_type == "success":
 
 st.title("Calendar")
 
-# -------------------------
+
 # SESSION INIT
-# -------------------------
 if "calendar_events" not in st.session_state:
     st.session_state.calendar_events = []
     if os.path.exists("calendar_events.json"):
@@ -522,9 +504,8 @@ if "view_date" not in st.session_state:
     st.session_state.view_date = None
 
 
-# -------------------------
+
 # OPTIONS
-# -------------------------
 calendar_options = {
     "initialView": st.session_state.view,
     "initialDate": st.session_state.view_date,

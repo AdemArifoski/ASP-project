@@ -83,7 +83,7 @@ weeks_needed(St,S,W) :-
 
 % OPTIMIZATION
 #maximize {
-    (P - W)@2,St,S,D,T,I :
+    (P - W),St,S,D,T,I :
     study(St,S,D,T,I),
     priority(St,S,P),
     subject_strength(St,S,W)
