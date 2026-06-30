@@ -38,6 +38,7 @@ A study scheduling application built with **Python**, **Streamlit**, and **Answe
 4. Specify your weekly availability.
 5. Generate a personalized study schedule.
 6. The application converts your input into ASP facts and uses **Clingo** to compute an optimized schedule that satisfies the defined constraints.
+7. View the generated study schedule in a calendar.
 
 ## Students Scheduling
 
