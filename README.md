@@ -46,7 +46,7 @@ The application also supports scheduling for multiple students.
 
 Using the **Students** page, you can:
 
-* Upload a JSON file containing student information.
+* Upload a JSON file containing students information.
 * Automatically convert the data into ASP facts.
 * Generate schedules using the ASP solver.
 * View the generated solution directly in the application.
